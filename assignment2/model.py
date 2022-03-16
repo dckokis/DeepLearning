@@ -17,8 +17,20 @@ class TwoLayerNet:
         reg, float - L2 regularization strength
         """
         self.reg = reg
-        # TODO Create necessary layers
-        raise Exception("Not implemented!")
+        self.layers = [FullyConnectedLayer(n_input, hidden_layer_size), ReLULayer(),
+                       FullyConnectedLayer(hidden_layer_size, n_output)]
+
+    def forward(self, X):
+        x = X.copy()
+        for layer in self.layers:
+            x = layer.forward(x)
+        return x
+
+    def backward(self, X):
+        x = X.copy()
+        for layer in reversed(self.layers):
+            x = layer.backward(x)
+        return x
 
     def compute_loss_and_gradients(self, X, y):
         """
@@ -31,17 +43,17 @@ class TwoLayerNet:
         """
         # Before running forward and backward pass through the model,
         # clear parameter gradients aggregated from the previous pass
-        # TODO Set parameter gradient to zeros
-        # Hint: using self.params() might be useful!
-        raise Exception("Not implemented!")
-        
-        # TODO Compute loss and fill param gradients
-        # by running forward and backward passes through the model
-        
-        # After that, implement l2 regularization on all params
-        # Hint: self.params() is useful again!
-        raise Exception("Not implemented!")
+        params = self.params()
+        for _, layer in params.items():
+            layer.grad = 0
 
+        x = self.forward(X)
+        loss, d_out = softmax_with_cross_entropy(x, y)
+        d_out = self.backward(d_out)
+        for _, layer in params.items():
+            l2_loss, l2_grad = l2_regularization(layer.value, self.reg)
+            layer.grad += l2_grad
+            loss += l2_loss
         return loss
 
     def predict(self, X):
@@ -54,19 +66,14 @@ class TwoLayerNet:
         Returns:
           y_pred, np.array of int (test_samples)
         """
-        # TODO: Implement predict
-        # Hint: some of the code of the compute_loss_and_gradients
-        # can be reused
-        pred = np.zeros(X.shape[0], np.int)
-
-        raise Exception("Not implemented!")
-        return pred
+        pred = self.forward(X)
+        return np.argmax(pred, axis=1)
 
     def params(self):
-        result = {}
-
-        # TODO Implement aggregating all of the params
-
-        raise Exception("Not implemented!")
-
+        result = {
+            'l1W': self.layers[0].params()['W'],
+            'l1B': self.layers[0].params()['B'],
+            'l2W': self.layers[2].params()['W'],
+            'l2B': self.layers[2].params()['B']
+        }
         return result

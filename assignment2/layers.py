@@ -1,6 +1,54 @@
 import numpy as np
 
 
+def softmax(predictions):
+    """
+    Computes probabilities from scores
+
+    Arguments:
+      predictions, np array, shape is either (N) or (batch_size, N) -
+        classifier output
+
+    Returns:
+      probs, np array of the same shape as predictions -
+        probability for every class, 0..1
+    """
+    pred_temp = np.copy(predictions)
+    if pred_temp.ndim == 1:
+        pred_temp -= np.max(predictions)
+        exp_pred = np.exp(pred_temp)
+        exp_sum = np.sum(exp_pred)
+        return exp_pred / exp_sum
+    else:
+        pred_temp = (pred_temp.T - np.max(predictions, axis=1)).T
+        exp_pred = np.exp(pred_temp)
+        exp_sum = np.sum(exp_pred, axis=1)
+        return (exp_pred.T / exp_sum).T
+
+
+def cross_entropy_loss(probs, target_index):
+    """
+    Computes cross-entropy loss
+
+    Arguments:
+      probs, np array, shape is either (N) or (batch_size, N) -
+        probabilities for every class
+      target_index: np array of int, shape is (1) or (batch_size) -
+        index of the true class for given sample(s)
+
+    Returns:
+      loss: single value
+    """
+    if probs.ndim == 1:
+        loss = -np.log(probs[target_index])
+    else:
+        batch_size = probs.shape[0]
+        loss_n = -np.log(probs[range(batch_size), target_index])
+        loss = np.sum(loss_n) / batch_size
+
+    return loss
+
+
 def l2_regularization(W, reg_strength):
     """
     Computes L2 regularization loss on weights and its gradient
@@ -13,8 +61,8 @@ def l2_regularization(W, reg_strength):
       loss, single value - l2 regularization loss
       gradient, np.array same shape as W - gradient of weight by l2 loss
     """
-    # TODO: Copy from the previous assignment
-    raise Exception("Not implemented!")
+    loss = reg_strength * np.sum(np.square(W))
+    grad = 2 * reg_strength * W
     return loss, grad
 
 
@@ -33,10 +81,16 @@ def softmax_with_cross_entropy(preds, target_index):
       loss, single value - cross-entropy loss
       dprediction, np array same shape as predictions - gradient of predictions by loss value
     """
-    # TODO: Copy from the previous assignment
-    raise Exception("Not implemented!")
-
-    return loss, d_preds
+    probs = softmax(preds)
+    loss = cross_entropy_loss(probs, target_index)
+    dprediction = probs
+    if probs.ndim == 1:
+        dprediction[target_index] -= 1
+    else:
+        batch_size = probs.shape[0]
+        dprediction[range(batch_size), target_index] -= 1
+        dprediction /= batch_size
+    return loss, dprediction
 
 
 class Param:
@@ -52,13 +106,11 @@ class Param:
 
 class ReLULayer:
     def __init__(self):
-        pass
+        self.X = None
 
     def forward(self, X):
-        # TODO: Implement forward pass
-        # Hint: you'll need to save some information about X
-        # to use it later in the backward pass
-        raise Exception("Not implemented!")
+        self.X = X
+        return np.where(X < 0, 0, X)
 
     def backward(self, d_out):
         """
@@ -72,10 +124,7 @@ class ReLULayer:
         d_result: np array (batch_size, num_features) - gradient
           with respect to input
         """
-        # TODO: Implement backward pass
-        # Your final implementation shouldn't have any loops
-        raise Exception("Not implemented!")
-        return d_result
+        return np.where(self.X < 0, 0, 1) * d_out
 
     def params(self):
         # ReLU Doesn't have any parameters
@@ -89,9 +138,8 @@ class FullyConnectedLayer:
         self.X = None
 
     def forward(self, X):
-        # TODO: Implement forward pass
-        # Your final implementation shouldn't have any loops
-        raise Exception("Not implemented!")
+        self.X = X
+        return np.dot(X, self.W.value) + self.B.value
 
     def backward(self, d_out):
         """
@@ -107,17 +155,9 @@ class FullyConnectedLayer:
         d_result: np array (batch_size, n_input) - gradient
           with respect to input
         """
-        # TODO: Implement backward pass
-        # Compute both gradient with respect to input
-        # and gradients with respect to W and B
-        # Add gradients of W and B to their `grad` attribute
-
-        # It should be pretty similar to linear classifier from
-        # the previous assignment
-
-        raise Exception("Not implemented!")
-
-        return d_input
+        self.W.grad += np.dot(self.X.T, d_out)
+        self.B.grad += np.dot(np.ones((1, d_out.shape[0])), d_out)
+        return np.dot(d_out, self.W.value.T)
 
     def params(self):
         return {'W': self.W, 'B': self.B}
